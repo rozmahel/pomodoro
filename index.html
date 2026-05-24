@@ -59,7 +59,6 @@ body {
   background: var(--bg); color: var(--text); font-family: var(--sans);
   min-height: 100vh; overflow-x: hidden; position: relative;
   transition: background 0.4s, color 0.4s;
-  overscroll-behavior: none;
 }
 
 /* ── Ambient ──────────────────────────────── */
@@ -640,6 +639,8 @@ body.mode-break .mode-tab.active { border-color: var(--accent-break); color: var
   .nav-tabs { margin-left: 0; }
   .nav-tab { padding: 5px 10px; font-size: 10px; }
   .tb-icon { width: 30px; height: 30px; font-size: 13px; }
+  .view.active { flex: none; }
+  .app-shell { min-height: auto; }
   /* Reduce ambient orbs on mobile */
   .ambient .orb-1 { width: 300px; height: 300px; }
   .ambient .orb-2 { width: 250px; height: 250px; bottom: -5%; }
