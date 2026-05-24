@@ -53,12 +53,13 @@ body.light {
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; overflow-y: scroll; }
+html { height: 100%; overflow-y: scroll; background: var(--bg); }
 
 body {
   background: var(--bg); color: var(--text); font-family: var(--sans);
   min-height: 100vh; overflow-x: hidden; position: relative;
   transition: background 0.4s, color 0.4s;
+  overscroll-behavior: none;
 }
 
 /* ── Ambient ──────────────────────────────── */
@@ -628,12 +629,21 @@ body.mode-break .mode-tab.active { border-color: var(--accent-break); color: var
   .ring-wrap { width: 240px; height: 240px; }
   .ring-wrap svg { width: 240px; height: 240px; }
   .overview-view { padding: 20px 16px; }
-  .nav-tabs { margin-left: 8px; }
-  .nav-tab { padding: 5px 10px; font-size: 10px; }
   .music-panel { padding: 24px 18px; }
   .notes-view { flex-direction: column; height: auto; }
   .notes-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 200px; }
   .notes-editor-wrap { padding: 16px; }
+  /* Topbar mobile */
+  .logo { display: none; }
+  .session-badge { display: none; }
+  .top-bar { padding: 10px 12px; gap: 6px; }
+  .nav-tabs { margin-left: 0; }
+  .nav-tab { padding: 5px 10px; font-size: 10px; }
+  .tb-icon { width: 30px; height: 30px; font-size: 13px; }
+  /* Reduce ambient orbs on mobile */
+  .ambient .orb-1 { width: 300px; height: 300px; }
+  .ambient .orb-2 { width: 250px; height: 250px; bottom: -5%; }
+  .ambient .orb-3 { width: 200px; height: 200px; }
 }
 </style>
 </head>
