@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600;700&display=swap');
+
+:root {
+  --bg: #0a0a12;
+  --bg2: #0f0f1a;
+  --glass: rgba(255,255,255,0.04);
+  --glass2: rgba(255,255,255,0.07);
+  --glass3: rgba(255,255,255,0.10);
+  --border: rgba(255,255,255,0.08);
+  --border-h: rgba(255,255,255,0.15);
+  --text: #e8e8f0;
+  --text2: #9898b0;
+  --text3: #5a5a72;
+  --accent: #f0c040;
+  --accent-glow: rgba(240,192,64,0.15);
+  --accent-break: #3dd68c;
+  --accent-break-glow: rgba(61,214,140,0.15);
+  --danger: #e05555;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Outfit', sans-serif;
+  --ring-circ: 678.58;
+  --blur: 20px;
+  --topbar-bg: rgba(15,15,26,0.6);
+  --sidebar-bg: rgba(15,15,26,0.5);
+  --modal-bg: #0f0f1a;
+  --hm-base: #0f0f1a;
+}
+
+/* ── LIGHT THEME ──────────────────────────── */
+body.light {
+  --bg: #f0f0f5;
+  --bg2: #e8e8ef;
+  --glass: rgba(0,0,0,0.03);
+  --glass2: rgba(0,0,0,0.05);
+  --glass3: rgba(0,0,0,0.08);
+  --border: rgba(0,0,0,0.08);
+  --border-h: rgba(0,0,0,0.15);
+  --text: #1a1a28;
+  --text2: #5a5a70;
+  --text3: #8a8aa0;
+  --danger: #d04040;
+  --topbar-bg: rgba(240,240,245,0.7);
+  --sidebar-bg: rgba(240,240,245,0.6);
+  --modal-bg: #e8e8ef;
+  --hm-base: #dddde5;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; overflow-y: scroll; }
+
+body {
+  background: var(--bg); color: var(--text); font-family: var(--sans);
+  min-height: 100vh; overflow-x: hidden; position: relative;
+  transition: background 0.4s, color 0.4s;
+}
+
+/* ── Ambient ──────────────────────────────── */
+.ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.ambient .orb {
+  position: absolute; border-radius: 50%; filter: blur(120px);
+  animation: orbFloat 22s ease-in-out infinite; transition: opacity 0.5s;
+}
+.ambient .orb-1 { width: 500px; height: 500px; background: var(--accent); top: -10%; left: -5%; opacity: 0.38; }
+.ambient .orb-2 { width: 400px; height: 400px; background: #6040d0; bottom: -15%; right: -5%; animation-delay: -7s; opacity: 0.38; }
+.ambient .orb-3 { width: 300px; height: 300px; background: var(--accent-break); top: 40%; left: 50%; animation-delay: -13s; opacity: 0.24; }
+body.light .ambient .orb { opacity: 0.15; }
+@keyframes orbFloat {
+  0%,100% { transform: translate(0,0) scale(1); }
+  33% { transform: translate(30px,-40px) scale(1.1); }
+  66% { transform: translate(-20px,30px) scale(0.9); }
+}
+
+/* ── Layout ───────────────────────────────── */
+.app-shell { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Top Bar ──────────────────────────────── */
+.top-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 20px;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  transition: background 0.4s;
+}
+.logo { font-family: var(--mono); font-size: 11px; letter-spacing: 0.25em; color: var(--text3); text-transform: uppercase; white-space: nowrap; }
+.logo b { color: var(--accent); font-weight: 600; transition: color 0.4s; }
+.nav-tabs { display: flex; gap: 4px; margin-left: 16px; }
+.nav-tab {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  padding: 6px 14px; background: transparent; border: 1px solid transparent;
+  color: var(--text3); cursor: pointer; border-radius: 4px; transition: all 0.2s;
+}
+.nav-tab:hover { color: var(--text2); border-color: var(--border); }
+.nav-tab.active { color: var(--text); border-color: var(--border-h); background: var(--glass2); }
+.top-spacer { flex: 1; }
+
+/* Topbar icon buttons */
+.tb-icon {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--glass2); border: 1px solid var(--border);
+  color: var(--text3); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(10px); transition: all 0.2s; flex-shrink: 0; padding: 0;
+}
+.tb-icon:hover { border-color: var(--accent); color: var(--accent); }
+.tb-icon.playing { color: var(--accent); border-color: rgba(240,192,64,0.3); animation: musicPulse 2s ease-in-out infinite; }
+@keyframes musicPulse { 0%,100%{box-shadow:none;} 50%{box-shadow:0 0 12px var(--accent-glow);} }
+
+.tb-icon.focus-active { color: var(--accent); border-color: var(--accent); background: var(--accent-glow); }
+
+.session-badge { font-family: var(--mono); font-size: 11px; color: var(--text3); letter-spacing: 0.1em; }
+.session-badge b { color: var(--text2); }
+
+/* ── Views ────────────────────────────────── */
+.view { display: none; flex: 1; }
+.view.active { display: flex; }
+
+/* ── TIMER VIEW ───────────────────────────── */
+.timer-view { flex-direction: row; }
+.timer-main {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px 24px 60px; gap: 28px; position: relative;
+  transition: padding 0.4s;
+}
+
+/* Focus mode */
+body.focus-mode .stats-panel,
+body.focus-mode .project-selector,
+body.focus-mode .mode-tabs,
+body.focus-mode #status-line,
+body.focus-mode .nav-tabs,
+body.focus-mode .session-badge,
+body.focus-mode .logo { display: none !important; }
+body.focus-mode .top-bar { justify-content: center; }
+body.focus-mode .top-spacer { display: none; }
+body.focus-mode .timer-main { padding: 0; justify-content: center; min-height: calc(100vh - 58px); }
+
+.project-selector { display: flex; align-items: center; gap: 8px; }
+.project-selector select {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--glass2); border: 1px solid var(--border);
+  color: var(--text); padding: 6px 12px; border-radius: 4px;
+  cursor: pointer; outline: none; backdrop-filter: blur(10px); transition: all 0.3s;
+}
+.project-selector select:focus { border-color: var(--accent); }
+.project-selector select option { background: var(--modal-bg); color: var(--text); }
+.project-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid var(--border); transition: background 0.3s;
+}
+
+/* Ring */
+.ring-wrap { position: relative; width: 280px; height: 280px; }
+.ring-wrap svg { position: absolute; top: 0; left: 0; transform: rotate(-90deg); }
+.ring-bg { stroke: var(--glass2); stroke-width: 4; fill: none; }
+#progress-ring {
+  stroke: var(--accent); stroke-width: 4; fill: none;
+  stroke-linecap: round; stroke-dasharray: var(--ring-circ);
+  stroke-dashoffset: 0; transition: stroke-dashoffset 0.9s linear, stroke 0.4s;
+  filter: drop-shadow(0 0 8px var(--accent-glow));
+}
+.ring-glow {
+  position: absolute; inset: -20px; border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+  opacity: 0.5; pointer-events: none; transition: all 0.4s;
+}
+.ring-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+#mode-emoji { font-size: 22px; }
+#timer-display {
+  font-family: var(--mono); font-size: 64px; font-weight: 300;
+  letter-spacing: -2px; line-height: 1; color: var(--text); display: flex; align-items: center;
+}
+#mode-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.35em; color: var(--accent); transition: color 0.4s; }
+.timer-part { display: inline-block; border-radius: 4px; transition: all 0.15s; }
+.timer-part.editable { cursor: text; padding: 0 4px; }
+.timer-part.editable:hover { background: var(--accent-glow); color: var(--accent); }
+.timer-colon { display: inline-block; opacity: 0.4; margin: 0 -2px; }
+.timer-input {
+  font-family: var(--mono); font-size: 64px; font-weight: 300;
+  letter-spacing: -2px; line-height: 1; color: var(--accent);
+  background: rgba(240,192,64,0.08); border: 2px solid var(--accent);
+  border-radius: 6px; text-align: center; padding: 0 6px; outline: none;
+  -moz-appearance: textfield; width: 100px;
+}
+.timer-input::-webkit-outer-spin-button,
+.timer-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+.mode-tabs { display: flex; gap: 6px; }
+.mode-tab {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  padding: 7px 16px; background: var(--glass); border: 1px solid var(--border);
+  color: var(--text3); cursor: pointer; border-radius: 4px; transition: all 0.25s;
+  backdrop-filter: blur(8px);
+}
+.mode-tab:hover { border-color: var(--border-h); color: var(--text2); }
+.mode-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+
+.controls { display: flex; gap: 8px; align-items: center; }
+.btn-primary {
+  font-family: var(--mono); font-size: 13px; letter-spacing: 0.15em;
+  padding: 12px 32px; background: var(--accent); color: var(--bg);
+  border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
+  transition: all 0.2s; box-shadow: 0 4px 20px var(--accent-glow);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--accent-glow); }
+.btn-primary:active { transform: translateY(0); }
+.btn-secondary {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+  padding: 10px 14px; background: var(--glass); color: var(--text3);
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.2s;
+  backdrop-filter: blur(8px);
+}
+.btn-secondary:hover { color: var(--text2); border-color: var(--border-h); }
+
+#status-line { font-family: var(--mono); font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-align: center; height: 18px; }
+
+/* ── Stats sidebar ────────────────────────── */
+.stats-panel {
+  width: 340px; flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+  padding: 24px 20px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 22px; transition: background 0.4s;
+}
+.stats-section-title {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.3em;
+  color: var(--text3); text-transform: uppercase;
+  margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-card {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px; backdrop-filter: blur(10px); transition: all 0.3s;
+}
+.stat-card .label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.2em; color: var(--text3); text-transform: uppercase; margin-bottom: 6px; }
+.stat-card .value { font-family: var(--mono); font-size: 18px; color: var(--text); line-height: 1; }
+.stat-card.highlight .value { color: var(--accent); transition: color 0.4s; }
+.stat-wide {
+  grid-column: 1 / -1; background: var(--glass); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;
+}
+.stat-wide .label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.2em; color: var(--text3); text-transform: uppercase; }
+.stat-wide .value { font-family: var(--mono); font-size: 14px; color: var(--text); }
+
+#heatmap { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+.hm-cell { aspect-ratio: 1; border-radius: 3px; background: var(--glass); transition: transform 0.15s; cursor: default; }
+.hm-cell:hover { transform: scale(1.3); }
+.hm-cell.hm-0 { background: var(--glass); border: 1px solid var(--border); }
+.hm-cell.hm-1 { background: color-mix(in srgb, var(--accent) 20%, var(--hm-base)); }
+.hm-cell.hm-2 { background: color-mix(in srgb, var(--accent) 40%, var(--hm-base)); }
+.hm-cell.hm-3 { background: color-mix(in srgb, var(--accent) 60%, var(--hm-base)); }
+.hm-cell.hm-4 { background: var(--accent); }
+
+.meta-row { display: flex; gap: 8px; }
+.meta-chip {
+  flex: 1; background: var(--glass); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.meta-chip .label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.2em; color: var(--text3); text-transform: uppercase; }
+.meta-chip .value { font-family: var(--mono); font-size: 14px; color: var(--text); }
+
+.data-actions { display: flex; gap: 6px; }
+.btn-action {
+  flex: 1; font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+  padding: 8px 6px; background: var(--glass); color: var(--text3);
+  border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.btn-action:hover { color: var(--text2); border-color: var(--border-h); }
+.btn-danger {
+  width: 100%; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+  padding: 8px; background: transparent; color: var(--text3); border: 1px solid var(--border);
+  border-radius: 4px; cursor: pointer; transition: all 0.2s; margin-top: auto;
+}
+.btn-danger:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ── OVERVIEW VIEW ────────────────────────── */
+.overview-view { flex-direction: column; padding: 32px; gap: 28px; max-width: 900px; margin: 0 auto; width: 100%; }
+.overview-header h2 { font-family: var(--mono); font-size: 16px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; }
+.overview-totals { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 12px; }
+.overview-card {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 8px; padding: 18px; backdrop-filter: blur(12px);
+}
+.overview-card .label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; color: var(--text3); text-transform: uppercase; margin-bottom: 8px; }
+.overview-card .value { font-family: var(--mono); font-size: 26px; color: var(--text); line-height: 1; }
+.overview-card.accent .value { color: var(--accent); }
+.projects-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 12px; }
+.project-card {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 8px; padding: 18px; backdrop-filter: blur(12px); transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.project-card:hover { border-color: var(--border-h); }
+.project-card .p-color-stripe { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.project-card .p-name { font-family: var(--sans); font-size: 16px; font-weight: 500; margin-bottom: 4px; margin-top: 4px; }
+.project-card .p-hours { font-family: var(--mono); font-size: 22px; margin: 8px 0 4px; }
+.project-card .p-goal { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 0.1em; }
+.project-card .p-bar-wrap { margin-top: 10px; height: 4px; background: var(--glass2); border-radius: 2px; overflow: hidden; }
+.project-card .p-bar { height: 100%; border-radius: 2px; transition: width 0.4s; }
+.project-card .p-actions { display: flex; gap: 6px; margin-top: 10px; }
+.project-card .p-heatmap {
+  display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-top: 12px;
+}
+
+/* Overview combined heatmap — three 7×5 blocks */
+.overview-hm-row {
+  display: flex; gap: 16px;
+}
+.overview-hm-block {
+  flex: 1;
+  display: grid; grid-template-columns: repeat(7,1fr); gap: 3px;
+}
+.p-btn {
+  font-family: var(--mono); font-size: 9px; padding: 4px 8px;
+  background: var(--glass2); border: 1px solid var(--border); color: var(--text3);
+  border-radius: 3px; cursor: pointer; transition: all 0.2s;
+}
+.p-btn:hover { color: var(--text2); border-color: var(--border-h); }
+.p-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+.add-project-card {
+  background: var(--glass); border: 2px dashed var(--border);
+  border-radius: 8px; padding: 18px; cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; min-height: 120px;
+  font-family: var(--mono); font-size: 12px; color: var(--text3); letter-spacing: 0.1em;
+}
+.add-project-card:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Modal ────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: none; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--modal-bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 28px; width: 380px; max-width: 90vw; transition: background 0.4s;
+}
+.modal h3 { font-family: var(--sans); font-size: 18px; font-weight: 400; margin-bottom: 18px; }
+.modal label {
+  display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em;
+  color: var(--text3); text-transform: uppercase; margin-bottom: 6px; margin-top: 14px;
+}
+.modal input[type="text"], .modal input[type="number"] {
+  width: 100%; font-family: var(--mono); font-size: 13px;
+  background: var(--glass2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 12px; border-radius: 4px; outline: none; transition: all 0.3s;
+}
+.modal input:focus { border-color: var(--accent); }
+.modal-btns { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+.modal-btns button { font-family: var(--mono); font-size: 11px; padding: 8px 18px; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+.modal-btn-cancel { background: transparent; border: 1px solid var(--border); color: var(--text3); }
+.modal-btn-cancel:hover { border-color: var(--border-h); color: var(--text2); }
+.modal-btn-ok { background: var(--accent); border: none; color: var(--bg); font-weight: 600; }
+.modal-btn-ok:hover { opacity: 0.88; }
+
+.color-grid { display: grid; grid-template-columns: repeat(8,1fr); gap: 6px; margin-top: 6px; }
+.color-swatch {
+  aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.15s; position: relative;
+}
+.color-swatch:hover { transform: scale(1.15); }
+.color-swatch.selected { border-color: var(--text); transform: scale(1.15); }
+.color-swatch.selected::after {
+  content: '✓'; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: rgba(0,0,0,0.6); font-weight: 700;
+}
+
+/* ── MUSIC OVERLAY ────────────────────────── */
+.music-overlay {
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(5,5,12,0.50);
+  backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
+  display: none; align-items: center; justify-content: center;
+  transition: opacity 0.25s;
+}
+body.light .music-overlay { background: rgba(200,200,210,0.40); }
+.music-overlay.open { display: flex; }
+.music-panel {
+  background: rgba(20,20,35,0.85); border: 1px solid var(--border);
+  border-radius: 14px; padding: 32px; width: 400px; max-width: 92vw;
+  backdrop-filter: blur(16px); box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  transform: translateY(10px); transition: transform 0.3s, background 0.4s;
+}
+body.light .music-panel { background: rgba(235,235,242,0.9); box-shadow: 0 24px 80px rgba(0,0,0,0.15); }
+.music-overlay.open .music-panel { transform: translateY(0); }
+.music-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.music-panel-header h3 { font-family: var(--sans); font-size: 18px; font-weight: 400; }
+.music-close {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--glass2); border: 1px solid var(--border);
+  color: var(--text3); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.music-close:hover { color: var(--text); border-color: var(--border-h); }
+.music-now { text-align: center; margin-bottom: 20px; }
+.music-now .track-name { font-family: var(--mono); font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
+.music-now .track-time { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+.music-progress { width: 100%; height: 4px; background: var(--glass2); border-radius: 2px; cursor: pointer; margin: 12px 0 16px; }
+.music-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.15s linear; }
+.music-controls { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
+.mc-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--glass2); border: 1px solid var(--border);
+  color: var(--text2); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s; padding: 0;
+}
+.mc-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mc-btn.play { width: 48px; height: 48px; font-size: 16px; }
+.music-volume { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; justify-content: center; }
+.music-volume span { font-size: 12px; color: var(--text3); }
+.music-volume input[type="range"] { width: 120px; accent-color: var(--accent); }
+.music-tracklist-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.music-tracklist-header span { font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; color: var(--text3); text-transform: uppercase; }
+.music-add-btn {
+  font-family: var(--mono); font-size: 9px; padding: 4px 10px;
+  background: var(--glass2); border: 1px solid var(--border); color: var(--text3);
+  border-radius: 3px; cursor: pointer; transition: all 0.2s;
+}
+.music-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+.music-tracklist { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.music-track-item {
+  font-family: var(--mono); font-size: 11px; color: var(--text3);
+  padding: 7px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.music-track-item:hover { background: var(--glass2); color: var(--text2); }
+.music-track-item.active { background: var(--accent-glow); color: var(--accent); }
+.music-empty { font-family: var(--mono); font-size: 11px; color: var(--text3); text-align: center; padding: 24px 0; letter-spacing: 0.05em; }
+
+/* Autoplay toggle */
+.music-autoplay { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.autoplay-label {
+  display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+  font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: 0.05em;
+}
+.autoplay-label input { display: none; }
+.autoplay-slider {
+  width: 36px; height: 20px; background: var(--glass2); border: 1px solid var(--border);
+  border-radius: 10px; position: relative; transition: all 0.25s; flex-shrink: 0;
+}
+.autoplay-slider::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--text3); transition: all 0.25s;
+}
+.autoplay-label input:checked + .autoplay-slider { background: var(--accent-glow); border-color: var(--accent); }
+.autoplay-label input:checked + .autoplay-slider::after { left: 18px; background: var(--accent); }
+
+/* ── NOTES VIEW ────────────────────────────── */
+.notes-view { flex-direction: row; height: calc(100vh - 58px); }
+
+.notes-sidebar {
+  width: 240px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+  display: flex; flex-direction: column;
+  transition: background 0.4s;
+}
+.notes-sidebar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 16px 12px; border-bottom: 1px solid var(--border);
+}
+.notes-sidebar-title {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+  color: var(--text3); text-transform: uppercase;
+}
+.notes-add-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--glass2); border: 1px solid var(--border);
+  color: var(--accent); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; font-family: var(--mono); padding: 0;
+}
+.notes-add-btn:hover { border-color: var(--accent); background: var(--accent-glow); }
+
+.notes-list {
+  flex: 1; overflow-y: auto; padding: 8px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.note-item {
+  font-family: var(--mono); font-size: 11px; color: var(--text3);
+  padding: 8px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid transparent;
+}
+.note-item:hover { background: var(--glass2); color: var(--text2); }
+.note-item.active { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+.note-item[data-color] { border-left: 3px solid var(--border); }
+.note-item .note-date {
+  display: block; font-size: 9px; color: var(--text3); margin-top: 2px; opacity: 0.7;
+}
+.note-item.active .note-date { color: var(--accent); opacity: 0.6; }
+
+.notes-sidebar-footer {
+  padding: 12px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+.notes-main {
+  flex: 1; display: flex; flex-direction: column; min-width: 0;
+}
+
+.notes-toolbar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--topbar-bg);
+  backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+  position: relative; z-index: 10;
+}
+.nt-btn {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  padding: 5px 10px; background: var(--glass); border: 1px solid var(--border);
+  color: var(--text3); border-radius: 4px; cursor: pointer; transition: all 0.2s;
+}
+.nt-btn:hover { color: var(--text2); border-color: var(--border-h); }
+.nt-btn:active { background: var(--accent-glow); color: var(--accent); }
+.nt-btn.nt-delete { border-color: transparent; background: transparent; }
+.nt-btn.nt-delete:hover { color: var(--danger); }
+
+/* Assign dropdown */
+.nt-assign-wrap { position: relative; }
+.nt-assign-dropdown {
+  display: none; position: absolute; right: 0; top: 100%; margin-top: 4px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
+  min-width: 180px; z-index: 20; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.nt-assign-dropdown.open { display: block; }
+.nt-assign-item {
+  font-family: var(--mono); font-size: 11px; padding: 8px 12px;
+  color: var(--text2); cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 8px;
+}
+.nt-assign-item:hover { background: var(--glass2); }
+.nt-assign-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Export reminder */
+.export-reminder {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em;
+  color: var(--accent); background: var(--accent-glow);
+  border: 1px solid rgba(240,192,64,0.2); border-radius: 4px;
+  padding: 6px 10px; text-align: center; cursor: pointer; transition: all 0.2s;
+}
+.export-reminder:hover { border-color: var(--accent); }
+
+.notes-editor-wrap {
+  flex: 1; padding: 24px; overflow-y: auto;
+}
+.notes-editor {
+  min-height: 100%; font-family: var(--sans); font-size: 15px;
+  color: var(--text); line-height: 1.7; outline: none;
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 8px; padding: 24px 28px;
+  backdrop-filter: blur(10px);
+  transition: border-color 0.2s;
+}
+.notes-editor:focus { border-color: var(--border-h); }
+.notes-editor:empty::before {
+  content: attr(data-placeholder); color: var(--text3); pointer-events: none;
+}
+.notes-editor h1 {
+  font-family: var(--sans); font-size: 24px; font-weight: 600;
+  color: var(--text); margin: 16px 0 8px; line-height: 1.3;
+}
+.notes-editor h2 {
+  font-family: var(--sans); font-size: 18px; font-weight: 500;
+  color: var(--text2); margin: 12px 0 6px; line-height: 1.4;
+}
+.notes-editor p { margin: 4px 0; }
+.notes-editor hr {
+  border: none; border-top: 1px solid var(--border); margin: 16px 0;
+}
+.notes-editor .note-check {
+  display: flex; align-items: flex-start; gap: 8px; margin: 4px 0;
+}
+.notes-editor .note-check input[type="checkbox"] {
+  margin-top: 5px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+}
+.notes-editor .note-check span {
+  flex: 1;
+}
+.notes-editor .note-check.checked span {
+  text-decoration: line-through; color: var(--text3);
+}
+.notes-empty-state {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; font-family: var(--mono); font-size: 12px;
+  color: var(--text3); letter-spacing: 0.05em;
+}
+
+/* ── Scrollbar ────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── break mode ───────────────────────────── */
+body.mode-break #progress-ring { stroke: var(--accent-break); filter: drop-shadow(0 0 8px var(--accent-break-glow)); }
+body.mode-break .ring-glow { background: radial-gradient(circle, var(--accent-break-glow) 0%, transparent 70%); }
+body.mode-break #mode-label { color: var(--accent-break); }
+body.mode-break .btn-primary { background: var(--accent-break); box-shadow: 0 4px 20px var(--accent-break-glow); }
+body.mode-break .mode-tab.active { border-color: var(--accent-break); color: var(--accent-break); background: var(--accent-break-glow); }
+
+/* ── Responsive ───────────────────────────── */
+@media (max-width: 760px) {
+  .timer-view { flex-direction: column; }
+  .stats-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+  #timer-display { font-size: 52px; }
+  .timer-input { font-size: 52px; width: 80px; }
+  .ring-wrap { width: 240px; height: 240px; }
+  .overview-view { padding: 20px 16px; }
+  .nav-tabs { margin-left: 8px; }
+  .nav-tab { padding: 5px 10px; font-size: 10px; }
+  .music-panel { padding: 24px 18px; }
+  .notes-view { flex-direction: column; height: auto; }
+  .notes-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 200px; }
+  .notes-editor-wrap { padding: 16px; }
+}
+</style>
+</head>
+<body class="mode-work">
+
+<div class="ambient">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<div class="app-shell">
+  <!-- TOP BAR: logo · nav · spacer · music · spacer · theme · focus · session -->
+  <div class="top-bar">
+    <div class="logo">⬡ STUDY <b>TIMER</b></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-view="timer">Časovač</button>
+      <button class="nav-tab" data-view="overview">Přehled</button>
+      <button class="nav-tab" data-view="notes">Poznámky</button>
+    </div>
+    <div class="top-spacer"></div>
+    <button class="tb-icon" id="music-toggle" title="Přehrávač hudby">♫</button>
+    <button class="tb-icon" id="theme-toggle" title="Světlý / tmavý režim">☀</button>
+    <button class="tb-icon" id="focus-toggle" title="Režim soustředění">◎</button>
+    <div class="session-badge">BLOK <b id="session-num">1</b></div>
+  </div>
+
+  <!-- TIMER VIEW -->
+  <div class="view timer-view active" id="view-timer">
+    <div class="timer-main">
+      <div class="project-selector">
+        <div class="project-dot" id="project-dot"></div>
+        <select id="active-project"></select>
+      </div>
+      <div class="ring-wrap">
+        <div class="ring-glow"></div>
+        <svg width="280" height="280" viewBox="0 0 280 280">
+          <circle class="ring-bg" cx="140" cy="140" r="108"/>
+          <circle id="progress-ring" cx="140" cy="140" r="108"/>
+        </svg>
+        <div class="ring-center">
+          <div id="mode-emoji">📚</div>
+          <div id="timer-display">
+            <span id="timer-min" class="timer-part editable" title="Klikni pro úpravu">40</span><span class="timer-colon">:</span><span id="timer-sec" class="timer-part editable" title="Klikni pro úpravu">00</span>
+          </div>
+          <div id="mode-label">PRÁCE</div>
+        </div>
+      </div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="work-btn">📚 40 min</button>
+        <button class="mode-tab" id="break-btn">☕ 10 min</button>
+      </div>
+      <div class="controls">
+        <button class="btn-secondary" id="reset-btn">↺ RESET</button>
+        <button class="btn-primary" id="start-btn">▶ START</button>
+        <button class="btn-secondary" id="skip-btn">→ SKIP</button>
+      </div>
+      <div id="status-line">Připraven · klikni na čísla pro úpravu délky</div>
+    </div>
+
+    <aside class="stats-panel">
+      <div id="stats-proj-header" style="text-align:center;display:none">
+        <div id="stats-proj-name" style="font-family:var(--mono);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:8px"></div>
+        <div style="height:4px;background:var(--glass2);border-radius:2px;overflow:hidden;margin-bottom:4px"><div id="stats-proj-bar" style="height:100%;border-radius:2px;width:0%;transition:width 0.4s"></div></div>
+        <div id="stats-proj-pct" style="font-family:var(--mono);font-size:9px;color:var(--text3);text-align:right"></div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-title">Dnes</div>
+        <div class="stat-grid">
+          <div class="stat-card highlight"><div class="label">Odpracováno</div><div class="value" id="stat-today-time">0h 0min</div></div>
+          <div class="stat-card"><div class="label">Bloky</div><div class="value" id="stat-today-sessions">0</div></div>
+          <div class="stat-card"><div class="label">Spuštění</div><div class="value" id="stat-today-starts">0</div></div>
+        </div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-title">Aktivita · 5 týdnů</div>
+        <div id="heatmap"></div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-chip"><div class="label">Série</div><div class="value" id="stat-streak">—</div></div>
+        <div class="meta-chip"><div class="label">Tento týden</div><div class="value" id="stat-week-time">0h 0min</div></div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-section-title">Celkem</div>
+        <div class="stat-grid">
+          <div class="stat-card highlight"><div class="label">Celkem hodin</div><div class="value" id="stat-total-time">0h 0min</div></div>
+          <div class="stat-card"><div class="label">Bloků celkem</div><div class="value" id="stat-total-sessions">0</div></div>
+          <div class="stat-wide"><div class="label">Celkový počet spuštění</div><div class="value" id="stat-total-starts">0</div></div>
+        </div>
+      </div>
+      <div id="export-reminder" class="export-reminder" style="display:none" onclick="document.getElementById('export-btn').click();this.style.display='none'"></div>
+      <div class="data-actions">
+        <button class="btn-action" id="export-btn">⬇ Export</button>
+        <button class="btn-action" id="import-btn">⬆ Import</button>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none">
+      <button class="btn-danger" id="reset-stats-btn">⚠ Smazat vše</button>
+    </aside>
+  </div>
+
+  <!-- OVERVIEW VIEW -->
+  <div class="view overview-view" id="view-overview">
+    <div class="overview-header"><h2>Přehled projektů</h2></div>
+    <div class="overview-totals" id="overview-totals"></div>
+    <div class="stats-section-title" style="margin-top:8px;font-size:16px;letter-spacing:0.2em;font-weight:500">Projekty</div>
+    <div class="projects-grid" id="projects-grid"></div>
+    <div class="stats-section-title" style="margin-top:24px;font-size:16px;letter-spacing:0.2em;font-weight:500">Celková aktivita · 15 týdnů</div>
+    <div class="overview-hm-row">
+      <div id="overview-hm-0" class="overview-hm-block"></div>
+      <div id="overview-hm-1" class="overview-hm-block"></div>
+      <div id="overview-hm-2" class="overview-hm-block"></div>
+    </div>
+  </div>
+
+  <!-- NOTES VIEW -->
+  <div class="view notes-view" id="view-notes">
+    <aside class="notes-sidebar">
+      <div class="notes-sidebar-header">
+        <span class="notes-sidebar-title">Poznámky</span>
+        <button class="notes-add-btn" id="notes-add" title="Nová poznámka">+</button>
+      </div>
+      <div class="notes-list" id="notes-list"></div>
+      <div class="notes-sidebar-footer">
+        <div class="data-actions">
+          <button class="btn-action" id="notes-export">⬇ Export</button>
+          <button class="btn-action" id="notes-import-btn">⬆ Import</button>
+        </div>
+        <input type="file" id="notes-import-file" accept=".json" style="display:none">
+        <button class="btn-danger" id="notes-delete-all">⚠ Smazat vše</button>
+      </div>
+    </aside>
+    <div class="notes-main">
+      <div class="notes-toolbar" id="notes-toolbar">
+        <button class="nt-btn" data-cmd="h1" title="Nadpis">H1</button>
+        <button class="nt-btn" data-cmd="h2" title="Podnadpis">H2</button>
+        <button class="nt-btn" data-cmd="p" title="Normální text">T</button>
+        <button class="nt-btn" data-cmd="hr" title="Oddělovač">―</button>
+        <button class="nt-btn" data-cmd="check" title="Zaškrtávací pole">☐</button>
+        <div style="flex:1"></div>
+        <div class="nt-assign-wrap">
+          <button class="nt-btn" id="notes-assign" title="Přiřadit k projektu">+ projekt</button>
+          <div class="nt-assign-dropdown" id="notes-assign-dropdown"></div>
+        </div>
+        <button class="nt-btn nt-delete" id="notes-delete" title="Smazat poznámku">🗑</button>
+      </div>
+      <div class="notes-editor-wrap">
+        <div class="notes-editor" id="notes-editor" contenteditable="true" spellcheck="true" data-placeholder="Vyber nebo vytvoř poznámku..."></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="music-overlay" id="music-overlay">
+  <div class="music-panel">
+    <div class="music-panel-header">
+      <h3>♫ Přehrávač</h3>
+      <button class="music-close" id="music-close">✕</button>
+    </div>
+    <div class="music-now">
+      <div class="track-name" id="pl-track">Žádná hudba</div>
+      <div class="track-time" id="pl-time">0:00 / 0:00</div>
+    </div>
+    <div class="music-progress" id="pl-progress-bar">
+      <div class="music-progress-fill" id="pl-progress-fill"></div>
+    </div>
+    <div class="music-controls">
+      <button class="mc-btn" id="pl-prev">⏮</button>
+      <button class="mc-btn play" id="pl-play">▶</button>
+      <button class="mc-btn" id="pl-next">⏭</button>
+    </div>
+    <div class="music-volume">
+      <span>🔈</span>
+      <input type="range" id="pl-vol" min="0" max="100" value="50">
+      <span>🔊</span>
+    </div>
+    <div class="music-tracklist-header">
+      <span>Seznam skladeb</span>
+      <button class="music-add-btn" id="pl-add">+ Přidat soubory</button>
+    </div>
+    <div class="music-tracklist" id="pl-tracklist">
+      <div class="music-empty">Zatím žádné skladby.<br>Přidej mp3 soubory tlačítkem výše.</div>
+    </div>
+    <div class="music-autoplay">
+      <label class="autoplay-label">
+        <span>Automaticky přehrávat při práci</span>
+        <input type="checkbox" id="pl-autoplay">
+        <span class="autoplay-slider"></span>
+      </label>
+    </div>
+    <input type="file" id="pl-file" accept="audio/*" multiple style="display:none">
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="modal-overlay" id="project-modal">
+  <div class="modal">
+    <h3 id="modal-title">Nový projekt</h3>
+    <label>Název projektu</label>
+    <input type="text" id="modal-name" placeholder="např. Bakalářka">
+    <label>Cíl (hodiny)</label>
+    <input type="number" id="modal-goal" placeholder="100" min="1" value="100">
+    <label>Barva projektu</label>
+    <div class="color-grid" id="color-grid"></div>
+    <div class="modal-btns">
+      <button class="modal-btn-cancel" id="modal-cancel">Zrušit</button>
+      <button class="modal-btn-ok" id="modal-ok">Uložit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROJECT_COLORS=['#f0c040','#e8a020','#e06830','#e05050','#d84888','#c050d0','#8060e0','#5070e8','#3898e8','#30b8d0','#30c8a0','#3dd68c','#60c040','#98b830','#b8a040','#a89080'];
+function hexToGlow(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;}
+
+// ═══════ SOUND ═══════
+const SoundEngine=(()=>{let ctx=null;function gc(){if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();return ctx;}
+function t(f,tp,s,d,g=.3){const c=gc(),o=c.createOscillator(),e=c.createGain();o.connect(e);e.connect(c.destination);o.type=tp;o.frequency.setValueAtTime(f,s);e.gain.setValueAtTime(0,s);e.gain.linearRampToValueAtTime(g,s+.01);e.gain.exponentialRampToValueAtTime(.001,s+d);o.start(s);o.stop(s+d+.05);}
+return{workEnd(){const c=gc(),n=c.currentTime;t(523.25,'sine',n,.4,.25);t(659.25,'sine',n+.1,.4,.25);t(783.99,'sine',n+.2,.6,.25);t(1046.5,'sine',n+.35,.8,.2);},
+breakEnd(){const c=gc(),n=c.currentTime;t(880,'square',n,.12,.15);t(880,'square',n+.18,.12,.15);t(1108,'sine',n+.4,.3,.2);},
+start(){const c=gc(),n=c.currentTime;t(440,'sine',n,.15,.2);t(660,'sine',n+.15,.25,.2);}};})();
+
+// ═══════ STATS ═══════
+const Stats=(()=>{const K='pomodoro_stats_v2',DK='pomodoro_durations_v1';
+function td(){return new Date().toISOString().slice(0,10);}
+function ld(){try{return JSON.parse(localStorage.getItem(K))||df();}catch{return df();}}
+function df(){return{totalWorkSeconds:0,totalSessions:0,totalStarts:0,days:{},history:[]};}
+function sv(d){localStorage.setItem(K,JSON.stringify(d));}
+function ed(d){const k=td();if(!d.days[k])d.days[k]={workSeconds:0,sessions:0,starts:0};return d;}
+function loadDurations(){try{return JSON.parse(localStorage.getItem(DK));}catch{return null;}}
+function saveDurations(d){localStorage.setItem(DK,JSON.stringify(d));}
+function recordStart(){const d=ed(ld());d.totalStarts++;d.days[td()].starts++;sv(d);}
+function recordWorkSession(s,pid){const d=ed(ld());d.totalWorkSeconds+=s;d.totalSessions++;d.days[td()].workSeconds+=s;d.days[td()].sessions++;d.history.unshift({date:new Date().toISOString(),type:'work',durationSeconds:s,projectId:pid||null});if(d.history.length>200)d.history.length=200;sv(d);if(pid)Projects.addSeconds(pid,s);}
+function get(){const d=ld(),t2=d.days[td()]||{workSeconds:0,sessions:0,starts:0};return{total:{hours:Math.floor(d.totalWorkSeconds/3600),minutes:Math.floor((d.totalWorkSeconds%3600)/60),sessions:d.totalSessions,starts:d.totalStarts},today:{hours:Math.floor(t2.workSeconds/3600),minutes:Math.floor((t2.workSeconds%3600)/60),sessions:t2.sessions,starts:t2.starts},week:cw(d.days),streak:cs(d.days),heatmap:bh(d.days)};}
+function cs(days){let s=0,d=new Date();while(true){const k=d.toISOString().slice(0,10);if(days[k]&&days[k].workSeconds>0){s++;d.setDate(d.getDate()-1);}else break;}return s;}
+function cw(days){let t=0;const d=new Date();for(let i=0;i<7;i++){const k=d.toISOString().slice(0,10);if(days[k])t+=days[k].workSeconds;d.setDate(d.getDate()-1);}return{hours:Math.floor(t/3600),minutes:Math.floor((t%3600)/60)};}
+function bh(days){const r=[],d=new Date();for(let i=34;i>=0;i--){const dd=new Date(d);dd.setDate(dd.getDate()-i);const k=dd.toISOString().slice(0,10);r.push({date:k,seconds:days[k]?days[k].workSeconds:0});}return r;}
+function exportData(){localStorage.setItem('pomodoro_last_export',new Date().toISOString());const p={version:2,exportedAt:new Date().toISOString(),stats:ld(),durations:loadDurations(),projects:Projects.getAll()};const b=new Blob([JSON.stringify(p,null,2)],{type:'application/json'});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='pomodoro-'+td()+'.json';a.click();URL.revokeObjectURL(u);}
+function importData(f,cb){if(!f)return;const r=new FileReader();r.onload=e=>{try{const p=JSON.parse(e.target.result);if(p.stats)sv(p.stats);if(p.durations)saveDurations(p.durations);if(p.projects)Projects.setAll(p.projects);alert('Data načtena!');if(cb)cb();}catch{alert('Chyba importu.');}};r.readAsText(f);}
+function reset(){if(confirm('Opravdu smazat VŠECHNY statistiky a projekty? Tato akce je nevratná.')){localStorage.removeItem(K);return true;}return false;}
+return{recordStart,recordWorkSession,get,reset,loadDurations,saveDurations,exportData,importData};})();
+
+// ═══════ PROJECTS ═══════
+const Projects=(()=>{const K='pomodoro_projects_v1';
+function ld(){try{return JSON.parse(localStorage.getItem(K))||[];}catch{return[];}}
+function sv(p){localStorage.setItem(K,JSON.stringify(p));}
+function dk(){return new Date().toISOString().slice(0,10);}
+return{getAll(){return ld();},setAll(p){sv(p);},
+add(n,g,c){const p=ld();p.push({id:Date.now().toString(36),name:n,goalHours:g||100,color:c||PROJECT_COLORS[0],workedSeconds:0,days:{},sessions:0});sv(p);return p;},
+remove(id){sv(ld().filter(p=>p.id!==id));},
+update(id,d){const p=ld();const i=p.findIndex(x=>x.id===id);if(i>=0)Object.assign(p[i],d);sv(p);},
+addSeconds(id,s){const p=ld();const i=p.findIndex(x=>x.id===id);if(i>=0){p[i].workedSeconds=(p[i].workedSeconds||0)+s;if(!p[i].days)p[i].days={};const k=dk();p[i].days[k]=(p[i].days[k]||0)+s;p[i].sessions=(p[i].sessions||0)+1;sv(p);}},
+getById(id){return ld().find(p=>p.id===id)||null;},
+getStats(id){const p=ld().find(x=>x.id===id);if(!p)return null;const days=p.days||{};const k=dk();const tSec=days[k]||0;
+let wSec=0;const d1=new Date();for(let i=0;i<7;i++){wSec+=(days[d1.toISOString().slice(0,10)]||0);d1.setDate(d1.getDate()-1);}
+let streak=0;const d2=new Date();while(days[d2.toISOString().slice(0,10)]>0){streak++;d2.setDate(d2.getDate()-1);}
+const hm=[];const d3=new Date();for(let i=34;i>=0;i--){const dd=new Date(d3);dd.setDate(dd.getDate()-i);const k2=dd.toISOString().slice(0,10);hm.push({date:k2,seconds:days[k2]||0});}
+return{todaySec:tSec,weekSec:wSec,totalSec:p.workedSeconds||0,sessions:p.sessions||0,streak,heatmap:hm,goalHours:p.goalHours,name:p.name,color:p.color};
+}};})();
+
+// ═══════ NOTES ═══════
+const Notes=(()=>{
+const KEY='pomodoro_notes_v1';
+let notes=[],activeId=null;
+
+function load(){try{notes=JSON.parse(localStorage.getItem(KEY))||[];}catch{notes=[];}}
+function save(){localStorage.setItem(KEY,JSON.stringify(notes));}
+
+function create(){
+  const n={id:Date.now().toString(36),title:'Nová poznámka',content:'',created:new Date().toISOString(),updated:new Date().toISOString()};
+  notes.unshift(n);save();select(n.id);renderList();
+}
+
+function remove(id){
+  notes=notes.filter(n=>n.id!==id);save();
+  if(activeId===id){activeId=null;clearEditor();}
+  renderList();
+}
+
+function select(id){
+  saveActive();
+  activeId=id;
+  const n=notes.find(x=>x.id===id);
+  const ed=document.getElementById('notes-editor');
+  if(n){ed.innerHTML=n.content||'';ed.contentEditable='true';}
+  else clearEditor();
+  renderList();
+}
+
+function saveActive(){
+  if(!activeId)return;
+  const n=notes.find(x=>x.id===activeId);
+  if(!n)return;
+  const ed=document.getElementById('notes-editor');
+  n.content=ed.innerHTML;
+  // extract title from first line only
+  const tmp=document.createElement('div');tmp.innerHTML=n.content;
+  const first=tmp.querySelector('h1,h2,p,div,.note-check');
+  const txt=first?first.textContent.trim():tmp.textContent.trim();
+  const words=txt.split(/\s+/).slice(0,8).join(' ');
+  n.title=words||'Prázdná poznámka';
+  n.updated=new Date().toISOString();
+  save();
+}
+
+function clearEditor(){
+  const ed=document.getElementById('notes-editor');
+  ed.innerHTML='';ed.contentEditable='false';
+}
+
+function renderList(){
+  const list=document.getElementById('notes-list');
+  if(!notes.length){
+    list.innerHTML='<div class="notes-empty-state">Žádné poznámky</div>';
+    return;
+  }
+  const prjs=Projects.getAll();
+  list.innerHTML=notes.map(n=>{
+    const d=new Date(n.updated);
+    const ds=d.toLocaleDateString('cs-CZ',{day:'numeric',month:'numeric'});
+    const prj=n.projectId?prjs.find(p=>p.id===n.projectId):null;
+    const colorStyle=prj?'border-left:3px solid '+prj.color+';padding-left:7px':'';
+    return`<div class="note-item${n.id===activeId?' active':''}" data-id="${n.id}" style="${colorStyle}"><span>${esc(n.title)}</span><span class="note-date">${ds}</span></div>`;
+  }).join('');
+  list.querySelectorAll('.note-item').forEach(el=>{
+    el.addEventListener('click',()=>select(el.dataset.id));
+  });
+  updateAssignBtn();
+}
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+function execCmd(cmd){
+  const ed=document.getElementById('notes-editor');
+  if(!activeId){return;}
+  ed.focus();
+  if(cmd==='h1'){document.execCommand('formatBlock',false,'h1');}
+  else if(cmd==='h2'){document.execCommand('formatBlock',false,'h2');}
+  else if(cmd==='p'){document.execCommand('formatBlock',false,'p');}
+  else if(cmd==='hr'){document.execCommand('insertHTML',false,'<hr>');}
+  else if(cmd==='check'){
+    const html='<div class="note-check"><input type="checkbox" onclick="Notes.toggleCheck(this)"><span>Úkol</span></div><p><br></p>';
+    document.execCommand('insertHTML',false,html);
+  }
+}
+
+function toggleCheck(cb){
+  const wrap=cb.parentElement;
+  if(cb.checked)wrap.classList.add('checked');
+  else wrap.classList.remove('checked');
+  saveActive();
+}
+
+function updateAssignBtn(){
+  const btn=document.getElementById('notes-assign');
+  if(!btn)return;
+  if(!activeId){btn.textContent='+ projekt';btn.style.color='';return;}
+  const n=notes.find(x=>x.id===activeId);
+  if(n&&n.projectId){
+    const prj=Projects.getAll().find(p=>p.id===n.projectId);
+    btn.textContent=prj?prj.name:'+ projekt';
+    btn.style.color=prj?prj.color:'';
+  } else {btn.textContent='+ projekt';btn.style.color='';}
+}
+
+function showAssignDropdown(){
+  if(!activeId)return;
+  const dd=document.getElementById('notes-assign-dropdown');
+  const prjs=Projects.getAll();
+  const n=notes.find(x=>x.id===activeId);
+  dd.innerHTML='<div class="nt-assign-item" data-pid="">✕ Odebrat projekt</div>'+prjs.map(p=>
+    `<div class="nt-assign-item" data-pid="${p.id}"><span class="nt-assign-dot" style="background:${p.color}"></span>${esc(p.name)}</div>`
+  ).join('');
+  dd.classList.add('open');
+  dd.querySelectorAll('.nt-assign-item').forEach(it=>{
+    it.addEventListener('click',()=>{
+      const pid=it.dataset.pid;
+      if(n){n.projectId=pid||null;save();}
+      dd.classList.remove('open');
+      renderList();
+    });
+  });
+  // close on outside click
+  setTimeout(()=>{
+    const close=e=>{if(!dd.contains(e.target)){dd.classList.remove('open');document.removeEventListener('click',close);}};
+    document.addEventListener('click',close);
+  },0);
+}
+
+function getCountByProject(pid){return notes.filter(n=>n.projectId===pid).length;}
+
+function deleteActive(){
+  if(!activeId)return;
+  if(confirm('Smazat tuto poznámku?'))remove(activeId);
+}
+
+function deleteAll(){
+  if(!confirm('Smazat VŠECHNY poznámky?'))return;
+  notes=[];activeId=null;save();clearEditor();renderList();
+}
+
+function exportNotes(){
+  saveActive();
+  const payload={version:1,exportedAt:new Date().toISOString(),notes};
+  const b=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download='poznamky-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u);
+}
+
+function importNotes(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{try{
+    const p=JSON.parse(e.target.result);
+    if(p.notes&&Array.isArray(p.notes)){notes=p.notes;save();activeId=null;clearEditor();renderList();alert('Poznámky načteny!');}
+    else{alert('Chyba: neplatný formát.');}
+  }catch{alert('Chyba importu.');}};
+  r.readAsText(file);
+}
+
+function init(){
+  load();renderList();
+  // toolbar
+  document.querySelectorAll('.nt-btn[data-cmd]').forEach(btn=>{
+    btn.addEventListener('click',()=>execCmd(btn.dataset.cmd));
+  });
+  document.getElementById('notes-delete').addEventListener('click',deleteActive);
+  document.getElementById('notes-assign').addEventListener('click',e=>{e.stopPropagation();showAssignDropdown();});
+  document.getElementById('notes-add').addEventListener('click',create);
+  document.getElementById('notes-delete-all').addEventListener('click',deleteAll);
+  document.getElementById('notes-export').addEventListener('click',exportNotes);
+  document.getElementById('notes-import-btn').addEventListener('click',()=>document.getElementById('notes-import-file').click());
+  document.getElementById('notes-import-file').addEventListener('change',e=>{importNotes(e.target.files[0]);e.target.value='';});
+  // auto-save on input
+  const ed2=document.getElementById('notes-editor');
+  ed2.addEventListener('input',()=>{saveActive();renderList();});
+  // handle Enter inside checkboxes
+  ed2.addEventListener('keydown',e=>{
+    if(e.key!=='Enter')return;
+    const sel=window.getSelection();
+    if(!sel.rangeCount)return;
+    const node=sel.anchorNode;
+    const check=node.nodeType===3?node.parentElement.closest('.note-check'):node.closest('.note-check');
+    if(!check)return;
+    e.preventDefault();
+    const p=document.createElement('p');p.innerHTML='<br>';
+    check.after(p);
+    const range=document.createRange();range.setStart(p,0);range.collapse(true);
+    sel.removeAllRanges();sel.addRange(range);
+  });
+}
+
+return{init,toggleCheck,save:saveActive,getCountByProject};
+})();
+
+// ═══════ PLAYER ═══════
+const Player=(()=>{let tracks=[],current=-1,audio=new Audio(),playing=false,autoPlay=false;
+function init(){audio.volume=.5;
+const ap=document.getElementById('pl-autoplay');
+const savedAP=localStorage.getItem('pomodoro_autoplay');
+if(savedAP==='1'){autoPlay=true;ap.checked=true;}
+ap.addEventListener('change',()=>{autoPlay=ap.checked;localStorage.setItem('pomodoro_autoplay',autoPlay?'1':'0');});
+const ov=document.getElementById('music-overlay');
+document.getElementById('music-toggle').addEventListener('click',()=>ov.classList.toggle('open'));
+document.getElementById('music-close').addEventListener('click',()=>ov.classList.remove('open'));
+ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('open');});
+document.getElementById('pl-add').addEventListener('click',()=>document.getElementById('pl-file').click());
+document.getElementById('pl-file').addEventListener('change',e=>{for(const f of e.target.files){if(f.type.startsWith('audio/')||f.name.endsWith('.mp3'))tracks.push({name:f.name.replace(/\.\w+$/,''),url:URL.createObjectURL(f)});}if(tracks.length&&current<0)loadTrack(0);renderList();e.target.value='';document.getElementById('music-toggle').classList.toggle('playing',tracks.length>0);});
+document.getElementById('pl-play').addEventListener('click',togglePlay);
+document.getElementById('pl-prev').addEventListener('click',()=>{if(tracks.length){loadTrack((current-1+tracks.length)%tracks.length);if(playing)audio.play();renderList();}});
+document.getElementById('pl-next').addEventListener('click',()=>{if(tracks.length){loadTrack((current+1)%tracks.length);if(playing)audio.play();renderList();}});
+document.getElementById('pl-vol').addEventListener('input',e=>{audio.volume=e.target.value/100;});
+document.getElementById('pl-progress-bar').addEventListener('click',e=>{if(!audio.duration)return;audio.currentTime=(e.offsetX/e.currentTarget.offsetWidth)*audio.duration;});
+audio.addEventListener('timeupdate',()=>{if(!audio.duration)return;document.getElementById('pl-progress-fill').style.width=(audio.currentTime/audio.duration*100)+'%';document.getElementById('pl-time').textContent=fmt(audio.currentTime)+' / '+fmt(audio.duration);});
+audio.addEventListener('ended',()=>{if(tracks.length>1){loadTrack((current+1)%tracks.length);audio.play();renderList();}else{playing=false;document.getElementById('pl-play').textContent='▶';document.getElementById('music-toggle').classList.remove('playing');}});}
+function loadTrack(i){current=i;audio.src=tracks[i].url;document.getElementById('pl-track').textContent=tracks[i].name;document.getElementById('pl-progress-fill').style.width='0%';document.getElementById('pl-time').textContent='0:00 / 0:00';}
+function togglePlay(){if(current<0)return;if(playing){audio.pause();playing=false;document.getElementById('pl-play').textContent='▶';}else{audio.play();playing=true;document.getElementById('pl-play').textContent='⏸';}document.getElementById('music-toggle').classList.toggle('playing',playing);}
+function renderList(){const el=document.getElementById('pl-tracklist');if(!tracks.length){el.innerHTML='<div class="music-empty">Zatím žádné skladby.<br>Přidej mp3 soubory tlačítkem výše.</div>';return;}el.innerHTML=tracks.map((t,i)=>`<div class="music-track-item${i===current?' active':''}" data-i="${i}">${t.name}</div>`).join('');el.querySelectorAll('.music-track-item').forEach(it=>{it.addEventListener('click',()=>{loadTrack(parseInt(it.dataset.i));if(!playing)togglePlay();else audio.play();renderList();});});}
+function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');}
+function autoPlayStart(){if(!autoPlay||current<0)return;if(!playing){audio.play();playing=true;document.getElementById('pl-play').textContent='⏸';document.getElementById('music-toggle').classList.add('playing');}}
+function autoPlayStop(){if(!autoPlay)return;if(playing){audio.pause();playing=false;document.getElementById('pl-play').textContent='▶';document.getElementById('music-toggle').classList.remove('playing');}}
+return{init,autoPlayStart,autoPlayStop};})();
+
+// ═══════ APP ═══════
+const App=(()=>{
+const DEFAULTS={workSec:40*60,breakSec:10*60};
+let durations=Stats.loadDurations()||{...DEFAULTS};
+let state={mode:'work',remaining:durations.workSec,running:false,session:1,workStartTime:null,intervalId:null};
+const els={};function q(id){return document.getElementById(id);}
+
+function initRefs(){els.modeLabel=q('mode-label');els.modeEmoji=q('mode-emoji');els.sessionNum=q('session-num');els.progressRing=q('progress-ring');els.startBtn=q('start-btn');els.resetBtn=q('reset-btn');els.skipBtn=q('skip-btn');els.workBtn=q('work-btn');els.breakBtn=q('break-btn');els.statusLine=q('status-line');els.timerMin=q('timer-min');els.timerSec=q('timer-sec');els.projectDot=q('project-dot');}
+
+// ── Theme toggle ─────────────────────────
+function initTheme(){
+  const saved=localStorage.getItem('pomodoro_theme');
+  if(saved==='light')document.body.classList.add('light');
+  updateThemeIcon();
+  q('theme-toggle').addEventListener('click',()=>{document.body.classList.toggle('light');localStorage.setItem('pomodoro_theme',document.body.classList.contains('light')?'light':'dark');updateThemeIcon();});
+}
+function updateThemeIcon(){q('theme-toggle').textContent=document.body.classList.contains('light')?'🌙':'☀';}
+
+// ── Focus mode ───────────────────────────
+function initFocus(){
+  const btn=q('focus-toggle');
+  btn.addEventListener('click',()=>{document.body.classList.toggle('focus-mode');btn.classList.toggle('focus-active');});
+}
+
+// ── Project color ────────────────────────
+function applyProjectColor(){
+  const pid=q('active-project').value,p=pid?Projects.getById(pid):null;
+  const col=p&&p.color?p.color:'#f0c040';
+  document.documentElement.style.setProperty('--accent',col);
+  document.documentElement.style.setProperty('--accent-glow',hexToGlow(col,.15));
+  els.projectDot.style.background=pid?col:'transparent';
+  els.projectDot.style.borderColor=pid?'transparent':'var(--border)';
+}
+
+// ── Timer ────────────────────────────────
+function tick(){if(state.remaining<=0){onPhaseEnd();return;}state.remaining--;render();}
+function onPhaseEnd(){clearInterval(state.intervalId);state.running=false;state.remaining=0;render();if(state.mode==='work'){SoundEngine.workEnd();Player.autoPlayStop();const pid=q('active-project').value;Stats.recordWorkSession(durations.workSec,pid||null);updateStatsPanel();setTimeout(()=>switchMode('break'),600);}else{SoundEngine.breakEnd();setTimeout(()=>{state.session++;switchMode('work');},600);}}
+function totalSec(){return state.mode==='work'?durations.workSec:durations.breakSec;}
+
+// ── Edit time ────────────────────────────
+function startEdit(part){if(state.running)return;const isMin=part==='min',el=isMin?els.timerMin:els.timerSec;if(!el||el.tagName!=='SPAN')return;const cv=isMin?Math.floor(state.remaining/60):state.remaining%60;const inp=document.createElement('input');inp.type='number';inp.min='0';inp.max=isMin?'999':'59';inp.value=cv;inp.className='timer-input';el.replaceWith(inp);inp.select();
+function commit(){let v=parseInt(inp.value,10);if(isNaN(v)||v<0)v=0;if(!isMin&&v>59)v=59;const mins=isMin?v:Math.floor(state.remaining/60),secs=isMin?(state.remaining%60):v;const nt=Math.max(1,mins*60+secs);if(state.mode==='work')durations.workSec=nt;else durations.breakSec=nt;Stats.saveDurations(durations);state.remaining=nt;rebuildSpan(isMin?'timer-min':'timer-sec',inp);}
+function cancel(){rebuildSpan(isMin?'timer-min':'timer-sec',inp);render();}
+inp.addEventListener('blur',commit);inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.removeEventListener('blur',commit);cancel();}});}
+function rebuildSpan(id,old){const s=document.createElement('span');s.id=id;s.className='timer-part editable';s.title='Klikni pro úpravu';old.replaceWith(s);els.timerMin=q('timer-min');els.timerSec=q('timer-sec');bindEditClicks();render();els.workBtn.textContent='📚 '+fmtDurBtn(durations.workSec);els.breakBtn.textContent='☕ '+fmtDurBtn(durations.breakSec);}
+function bindEditClicks(){if(els.timerMin)els.timerMin.onclick=()=>startEdit('min');if(els.timerSec)els.timerSec.onclick=()=>startEdit('sec');}
+
+// ── Controls ─────────────────────────────
+function toggleStart(){if(state.running){clearInterval(state.intervalId);state.running=false;Player.autoPlayStop();}else{if(!q('active-project').value){els.statusLine.textContent='⚠ Nejdříve vytvořte projekt';return;}Stats.recordStart();SoundEngine.start();state.running=true;if(state.mode==='work'&&!state.workStartTime)state.workStartTime=Date.now();state.intervalId=setInterval(tick,1000);if(state.mode==='work')Player.autoPlayStart();}render();}
+function resetTimer(){clearInterval(state.intervalId);state.running=false;state.remaining=totalSec();render();}
+function skipPhase(){clearInterval(state.intervalId);state.running=false;if(state.mode==='work'){Player.autoPlayStop();const done=durations.workSec-state.remaining;const pid=q('active-project').value;if(done>30)Stats.recordWorkSession(done,pid||null);updateStatsPanel();switchMode('break');}else{state.session++;switchMode('work');}}
+function switchMode(mode){state.mode=mode;state.remaining=mode==='work'?durations.workSec:durations.breakSec;state.running=false;state.workStartTime=null;clearInterval(state.intervalId);if(Notification.permission==='granted')new Notification(mode==='work'?'📚 Čas na práci!':'☕ Přestávka!',{body:mode==='work'?fmtDurBtn(durations.workSec)+' soustředění.':fmtDurBtn(durations.breakSec)+' volno.',silent:true});els.workBtn.textContent='📚 '+fmtDurBtn(durations.workSec);els.breakBtn.textContent='☕ '+fmtDurBtn(durations.breakSec);render();updateStatsPanel();}
+function fmtDurBtn(sec){const m=Math.floor(sec/60),s=sec%60;return s>0?m+'m '+s+'s':m+' min';}
+
+// ── Render ───────────────────────────────
+function render(){const total=totalSec(),progress=1-state.remaining/total,isWork=state.mode==='work';const m=Math.floor(state.remaining/60),s=state.remaining%60;
+if(els.timerMin&&els.timerMin.tagName==='SPAN')els.timerMin.textContent=String(m).padStart(2,'0');
+if(els.timerSec&&els.timerSec.tagName==='SPAN')els.timerSec.textContent=String(s).padStart(2,'0');
+const ed=!state.running;[els.timerMin,els.timerSec].forEach(el=>{if(el&&el.tagName==='SPAN'){el.classList.toggle('editable',ed);el.title=ed?'Klikni pro úpravu':'';}});
+els.modeLabel.textContent=isWork?'PRÁCE':'PŘESTÁVKA';els.modeEmoji.textContent=isWork?'📚':'☕';els.sessionNum.textContent=state.session;
+els.startBtn.textContent=state.running?'⏸ PAUZA':(state.remaining===total?'▶ START':'▶ POKRAČOVAT');
+els.workBtn.classList.toggle('active',isWork);els.breakBtn.classList.toggle('active',!isWork);
+els.progressRing.style.strokeDashoffset=2*Math.PI*108*(1-progress);
+// preserve both mode-* and light/focus classes
+const classes=[];if(isWork)classes.push('mode-work');else classes.push('mode-break');
+if(document.body.classList.contains('light'))classes.push('light');
+if(document.body.classList.contains('focus-mode'))classes.push('focus-mode');
+document.body.className=classes.join(' ');
+if(state.running){const mins=Math.ceil(state.remaining/60);els.statusLine.textContent=isWork?'Soustřeď se · ještě '+mins+' min':'Odpočívej · ještě '+mins+' min';}
+else if(state.remaining===total)els.statusLine.textContent='Připraven · klikni na čísla pro úpravu délky';
+else els.statusLine.textContent='Pozastaveno';
+document.title=state.running?String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+' '+(isWork?'📚':'☕')+' Pomodoro':'Pomodoro';}
+
+// ── Stats panel ──────────────────────────
+function updateStatsPanel(){
+const pid=q('active-project').value;
+const ps=pid?Projects.getStats(pid):null;
+const hdr=q('stats-proj-header');
+if(ps){
+  hdr.style.display='block';
+  q('stats-proj-name').textContent=ps.name;
+  q('stats-proj-name').style.color=ps.color;
+  const pct=ps.goalHours?Math.min(100,ps.totalSec/3600/ps.goalHours*100):0;
+  q('stats-proj-bar').style.width=pct+'%';
+  q('stats-proj-bar').style.background=ps.color;
+  q('stats-proj-pct').textContent=(ps.totalSec/3600).toFixed(1)+'h / '+ps.goalHours+'h · '+pct.toFixed(0)+'%';
+  const tH=Math.floor(ps.todaySec/3600),tM=Math.floor((ps.todaySec%3600)/60);
+  st('stat-today-time',tH+'h '+tM+'min');
+  st('stat-today-sessions',ps.sessions);
+  st('stat-today-starts','—');
+  const wH=Math.floor(ps.weekSec/3600),wM=Math.floor((ps.weekSec%3600)/60);
+  st('stat-week-time',wH+'h '+wM+'min');
+  const aH=Math.floor(ps.totalSec/3600),aM=Math.floor((ps.totalSec%3600)/60);
+  st('stat-total-time',aH+'h '+aM+'min');
+  st('stat-total-sessions',ps.sessions);
+  st('stat-total-starts','—');
+  st('stat-streak',ps.streak>0?'🔥 '+ps.streak+' dní':'—');
+  rh(ps.heatmap,ps.color);
+} else {
+  hdr.style.display='none';
+  const s=Stats.get();
+  st('stat-today-time',s.today.hours+'h '+s.today.minutes+'min');
+  st('stat-today-sessions',s.today.sessions);
+  st('stat-today-starts',s.today.starts);
+  st('stat-total-time',s.total.hours+'h '+s.total.minutes+'min');
+  st('stat-total-sessions',s.total.sessions);
+  st('stat-total-starts',s.total.starts);
+  st('stat-week-time',s.week.hours+'h '+s.week.minutes+'min');
+  st('stat-streak',s.streak>0?'🔥 '+s.streak+' dní':'—');
+  rh(s.heatmap,null);
+}}
+function st(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function rh(data,col,target,maxOverride){const c=target||document.getElementById('heatmap');if(!c)return;const max=maxOverride||Math.max(...data.map(d=>d.seconds),1);c.innerHTML=data.map(d=>{const i=d.seconds/max;const l=i===0?0:i<.25?1:i<.5?2:i<.75?3:4;
+if(col&&l>0){const a=[0,.20,.45,.70,1][l];return'<div class="hm-cell" style="background:'+hexToGlow(col,a)+'" title="'+d.date+': '+Math.floor(d.seconds/60)+' min"></div>';}
+return'<div class="hm-cell hm-'+l+'" title="'+d.date+': '+Math.floor(d.seconds/60)+' min"></div>';}).join('');}
+
+// ── Project select ───────────────────────
+function refreshProjectSelect(){const sel=q('active-project'),prjs=Projects.getAll(),prev=sel.value;
+sel.innerHTML=prjs.length?prjs.map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join(''):'<option value="">— vytvořte projekt —</option>';
+if(prjs.find(p=>p.id===prev))sel.value=prev;
+else if(prjs.length)sel.value=prjs[0].id;
+applyProjectColor();updateStatsPanel();}
+
+// ── Nav ──────────────────────────────────
+function setupNav(){document.querySelectorAll('.nav-tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));q('view-'+btn.dataset.view).classList.add('active');if(btn.dataset.view==='overview')renderOverview();Notes.save();});});}
+
+// ── Overview ─────────────────────────────
+function renderOverview(){const prjs=Projects.getAll(),s=Stats.get();q('overview-totals').innerHTML=`<div class="overview-card accent"><div class="label">Celkem odpracováno</div><div class="value">${s.total.hours}h ${s.total.minutes}m</div></div><div class="overview-card"><div class="label">Bloků celkem</div><div class="value">${s.total.sessions}</div></div><div class="overview-card"><div class="label">Aktivní projekty</div><div class="value">${prjs.length}</div></div><div class="overview-card"><div class="label">Série</div><div class="value">${s.streak>0?'🔥 '+s.streak+' dní':'—'}</div></div>`;
+q('projects-grid').innerHTML=prjs.map(p=>{const h=(p.workedSeconds||0)/3600,pct=p.goalHours?Math.min(100,h/p.goalHours*100):0;const col=p.color||'#f0c040';const nc=Notes.getCountByProject(p.id);return`<div class="project-card"><div class="p-color-stripe" style="background:${col}"></div><div class="p-name">${esc(p.name)}</div><div class="p-hours" style="color:${col}">${h.toFixed(1)}h</div><div class="p-goal">Cíl: ${p.goalHours}h · ${pct.toFixed(0)}%${nc?' · 📝 '+nc:''}</div><div class="p-bar-wrap"><div class="p-bar" style="width:${pct}%;background:${col}"></div></div><div class="p-heatmap" id="hm-${p.id}"></div><div class="p-actions"><button class="p-btn" onclick="App.editProject('${p.id}')">✏ Upravit</button><button class="p-btn danger" onclick="App.deleteProject('${p.id}')">✕ Smazat</button></div></div>`;}).join('')+'<div class="add-project-card" id="add-project-btn">+ Nový projekt</div>';
+q('add-project-btn').addEventListener('click',()=>openModal());
+prjs.forEach(p=>{const ps=Projects.getStats(p.id);if(ps){const el=document.getElementById('hm-'+p.id);if(el)rh(ps.heatmap,ps.color,el);}});
+// Combined heatmap — 3 × 5 weeks
+const combined=[];const d=new Date();
+for(let i=104;i>=0;i--){const dd=new Date(d);dd.setDate(dd.getDate()-i);const k=dd.toISOString().slice(0,10);let tot=0;prjs.forEach(p=>{if(p.days&&p.days[k])tot+=p.days[k];});combined.push({date:k,seconds:tot});}
+const cMax=Math.max(...combined.map(x=>x.seconds),1);
+for(let b=0;b<3;b++){rh(combined.slice(b*35,(b+1)*35),'#f0c040',q('overview-hm-'+b),cMax);}}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+// ── Modal ────────────────────────────────
+let editingId=null,selectedColor=PROJECT_COLORS[0];
+function buildColorGrid(){const grid=q('color-grid');grid.innerHTML=PROJECT_COLORS.map(c=>`<div class="color-swatch${c===selectedColor?' selected':''}" data-color="${c}" style="background:${c}"></div>`).join('');grid.querySelectorAll('.color-swatch').forEach(sw=>{sw.addEventListener('click',()=>{grid.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected'));sw.classList.add('selected');selectedColor=sw.dataset.color;});});}
+function openModal(id){editingId=id||null;q('modal-title').textContent=id?'Upravit projekt':'Nový projekt';if(id){const p=Projects.getById(id);q('modal-name').value=p?p.name:'';q('modal-goal').value=p?p.goalHours:100;selectedColor=p&&p.color?p.color:PROJECT_COLORS[0];}else{q('modal-name').value='';q('modal-goal').value=100;selectedColor=PROJECT_COLORS[0];}buildColorGrid();q('project-modal').classList.add('open');q('modal-name').focus();}
+function closeModal(){q('project-modal').classList.remove('open');editingId=null;}
+function saveModal(){const name=q('modal-name').value.trim(),goal=parseInt(q('modal-goal').value,10)||100;if(!name)return;if(editingId)Projects.update(editingId,{name,goalHours:goal,color:selectedColor});else Projects.add(name,goal,selectedColor);closeModal();refreshProjectSelect();renderOverview();}
+function editProject(id){openModal(id);}
+function deleteProject(id){if(confirm('Smazat projekt?')){Projects.remove(id);refreshProjectSelect();renderOverview();}}
+
+// ── Init ─────────────────────────────────
+function init(){initRefs();bindEditClicks();setupNav();Player.init();Notes.init();initTheme();initFocus();
+els.startBtn.addEventListener('click',toggleStart);els.resetBtn.addEventListener('click',resetTimer);els.skipBtn.addEventListener('click',skipPhase);
+els.workBtn.addEventListener('click',()=>{if(state.mode!=='work')switchMode('work');});
+els.breakBtn.addEventListener('click',()=>{if(state.mode!=='break')switchMode('break');});
+q('reset-stats-btn').addEventListener('click',()=>{if(Stats.reset()){Projects.setAll([]);updateStatsPanel();refreshProjectSelect();}});
+q('export-btn').addEventListener('click',()=>{Stats.exportData();const r=document.getElementById('export-reminder');if(r)r.style.display='none';});q('import-btn').addEventListener('click',()=>q('import-file').click());
+q('import-file').addEventListener('change',e=>{Stats.importData(e.target.files[0],()=>{durations=Stats.loadDurations()||durations;state.remaining=totalSec();els.workBtn.textContent='📚 '+fmtDurBtn(durations.workSec);els.breakBtn.textContent='☕ '+fmtDurBtn(durations.breakSec);updateStatsPanel();refreshProjectSelect();renderOverview();render();e.target.value='';});});
+q('modal-cancel').addEventListener('click',closeModal);q('modal-ok').addEventListener('click',saveModal);
+q('project-modal').addEventListener('click',e=>{if(e.target===q('project-modal'))closeModal();});
+q('modal-name').addEventListener('keydown',e=>{if(e.key==='Enter')saveModal();});
+q('active-project').addEventListener('change',()=>{applyProjectColor();updateStatsPanel();});
+els.workBtn.textContent='📚 '+fmtDurBtn(durations.workSec);els.breakBtn.textContent='☕ '+fmtDurBtn(durations.breakSec);
+if('Notification'in window&&Notification.permission==='default')setTimeout(()=>Notification.requestPermission(),2000);
+refreshProjectSelect();render();updateStatsPanel();setInterval(()=>{if(state.running)updateStatsPanel();},30000);
+// auto-export reminder
+const lastExp=localStorage.getItem('pomodoro_last_export');
+const daysSince=lastExp?Math.floor((Date.now()-new Date(lastExp).getTime())/86400000):999;
+const remEl=document.getElementById('export-reminder');
+if(daysSince>=7&&remEl){remEl.textContent='⚠ Poslední export: '+(lastExp?daysSince+' dní zpět':'nikdy')+' · klikni pro export';remEl.style.display='block';}
+}
+
+return{init,editProject,deleteProject};})();
+document.addEventListener('DOMContentLoaded',App.init);
+</script>
+</body>
+</html>
