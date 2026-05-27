@@ -1,7 +1,7 @@
 {
-  "name": "Study Timer",
+  "name": "Pomodoro Timer",
   "short_name": "Timer",
-  "description": "Pomodoro časovač pro studium",
+  "description": "Pomodoro časovač pro studium a práci od Marka",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0a12",
