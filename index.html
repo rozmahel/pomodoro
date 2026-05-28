@@ -3,13 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0a0a12">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>Study Timer</title>
+<title>Pomodoro</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@200;300;400;500;600;700&display=swap');
 
@@ -213,6 +207,7 @@ body.focus-mode .timer-main { padding: 24px; justify-content: center; height: ca
 }
 .mode-tab:hover { border-color: var(--border-h); color: var(--text2); }
 .mode-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.mode-tab.disabled { opacity: 0.3; pointer-events: none; cursor: default; }
 
 .controls { display: flex; gap: 8px; align-items: center; }
 .btn-primary {
@@ -1194,6 +1189,7 @@ const ed=!state.running;[els.timerMin,els.timerSec].forEach(el=>{if(el&&el.tagNa
 els.modeLabel.textContent=isWork?'PRÁCE':'PŘESTÁVKA';els.modeEmoji.textContent=isWork?'📚':'☕';els.sessionNum.textContent=state.session;
 els.startBtn.textContent=state.running?'⏸ PAUZA':(state.remaining===total?'▶ START':'▶ POKRAČOVAT');
 els.workBtn.classList.toggle('active',isWork);els.breakBtn.classList.toggle('active',!isWork);
+els.workBtn.classList.toggle('disabled',state.running);els.breakBtn.classList.toggle('disabled',state.running);
 els.progressRing.style.strokeDashoffset=2*Math.PI*108*(1-progress);
 // preserve both mode-* and light/focus classes
 const classes=[];if(isWork)classes.push('mode-work');else classes.push('mode-break');
@@ -1282,8 +1278,8 @@ function deleteProject(id){if(confirm('Smazat projekt?')){Projects.remove(id);re
 // ── Init ─────────────────────────────────
 function init(){initRefs();bindEditClicks();setupNav();Player.init();Notes.init();initTheme();initFocus();
 els.startBtn.addEventListener('click',toggleStart);els.resetBtn.addEventListener('click',resetTimer);els.skipBtn.addEventListener('click',skipPhase);
-els.workBtn.addEventListener('click',()=>{if(state.mode!=='work')switchMode('work');});
-els.breakBtn.addEventListener('click',()=>{if(state.mode!=='break')switchMode('break');});
+els.workBtn.addEventListener('click',()=>{if(state.running||state.mode==='work')return;if(state.remaining<totalSec()&&state.mode==='break'){state.session++;switchMode('work');}else switchMode('work');});
+els.breakBtn.addEventListener('click',()=>{if(state.running||state.mode==='break')return;if(state.remaining<totalSec()&&state.mode==='work'){Player.autoPlayStop();const done=durations.workSec-state.remaining;const pid=q('active-project').value;if(done>30)Stats.recordWorkSession(done,pid||null);updateStatsPanel();switchMode('break');}else switchMode('break');});
 q('reset-stats-btn').addEventListener('click',()=>{if(Stats.reset()){Projects.setAll([]);updateStatsPanel();refreshProjectSelect();}});
 q('export-btn').addEventListener('click',()=>{Stats.exportData();const r=document.getElementById('export-reminder');if(r)r.style.display='none';});q('import-btn').addEventListener('click',()=>q('import-file').click());
 q('import-file').addEventListener('change',e=>{Stats.importData(e.target.files[0],()=>{durations=Stats.loadDurations()||durations;state.remaining=totalSec();els.workBtn.textContent='📚 '+fmtDurBtn(durations.workSec);els.breakBtn.textContent='☕ '+fmtDurBtn(durations.breakSec);updateStatsPanel();refreshProjectSelect();renderOverview();render();e.target.value='';});});
@@ -1303,9 +1299,6 @@ if(daysSince>=7&&remEl){remEl.textContent='⚠ Poslední export: '+(lastExp?days
 
 return{init,editProject,deleteProject};})();
 document.addEventListener('DOMContentLoaded',App.init);
-
-// PWA Service Worker
-if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 </script>
 </body>
 </html>
